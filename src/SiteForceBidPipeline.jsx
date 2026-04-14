@@ -63,6 +63,26 @@ function urgencyColor(days) {
   return "#059669";
 }
 
+function getFocusPriority(bid) {
+  const d = daysUntil(bid.due);
+  if (bid.status === "bidding") return { tier: 1, label: "ACTIVELY BIDDING", color: "#2563EB", bg: "#1E3A8A" };
+  if (d !== null && d <= 0) return { tier: 1, label: "PAST DUE — VERIFY", color: "#DC2626", bg: "#450A0A" };
+  if (d !== null && d <= 3) return { tier: 1, label: "DUE IN \u22643 DAYS", color: "#DC2626", bg: "#450A0A" };
+  if (d !== null && d <= 7) return { tier: 2, label: "DUE THIS WEEK", color: "#EA580C", bg: "#431407" };
+  if (bid.status === "review") return { tier: 2, label: "REVIEW IN PROGRESS", color: "#D97706", bg: "#451A03" };
+  if (bid.status === "tracking" && d !== null && d <= 14) return { tier: 3, label: "GO / NO-GO DECISION", color: "#A855F7", bg: "#2E1065" };
+  return { tier: 3, label: "ACTION REQUIRED", color: "#64748B", bg: "#1E293B" };
+}
+
+function isFocusBid(bid) {
+  if (["expired", "won", "lost", "nogo"].includes(bid.status)) return false;
+  const d = daysUntil(bid.due);
+  if (bid.status === "bidding") return true;
+  if (bid.status === "review") return true;
+  if (bid.status === "tracking" && d !== null && d <= 14) return true;
+  return false;
+}
+
 export default function SiteForceBidPipeline() {
   const [bids, setBids] = useState(INITIAL_BIDS);
   const [filterSource, setFilterSource] = useState("all");
@@ -72,6 +92,7 @@ export default function SiteForceBidPipeline() {
   const [view, setView] = useState("pipeline");
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showFocus, setShowFocus] = useState(false);
   const [newBid, setNewBid] = useState({ solicitation: "", title: "", source: "broward", type: "ITB", scope: [], due: "", notes: "", status: "tracking" });
 
   const filtered = bids.filter(b => {
@@ -91,6 +112,20 @@ export default function SiteForceBidPipeline() {
     if (sortBy === "status") return a.status.localeCompare(b.status);
     return 0;
   });
+
+  const todayBids = bids
+    .filter(isFocusBid)
+    .sort((a, b) => {
+      const pa = getFocusPriority(a).tier;
+      const pb = getFocusPriority(b).tier;
+      if (pa !== pb) return pa - pb;
+      const da = daysUntil(a.due);
+      const db = daysUntil(b.due);
+      if (da === null && db === null) return 0;
+      if (da === null) return 1;
+      if (db === null) return -1;
+      return da - db;
+    });
 
   const stats = {
     total: bids.length,
@@ -116,6 +151,8 @@ export default function SiteForceBidPipeline() {
     setShowAddForm(false);
   };
 
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
   return (
     <div style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif", background: "#0A0E17", color: "#E2E8F0", minHeight: "100vh", padding: "0" }}>
       <style>{`
@@ -132,85 +169,112 @@ export default function SiteForceBidPipeline() {
         .sf-pipeline { padding: 20px 28px; }
         .sf-sources-wrap { padding: 20px 28px; }
 
-        /* Filters: flex row on desktop */
         .sf-filters {
-          display: flex;
-          gap: 10px;
-          margin-bottom: 20px;
-          flex-wrap: wrap;
-          align-items: center;
+          display: flex; gap: 10px; margin-bottom: 20px;
+          flex-wrap: wrap; align-items: center;
         }
         .sf-search { flex: 1 1 200px; }
         .sf-filter-select { flex: 1 1 140px; }
         .sf-addbtn { flex-shrink: 0; }
 
-        /* Bid card: 3-column row on desktop */
-        .sf-card {
-          display: flex;
-          align-items: flex-start;
-          gap: 16px;
-        }
-        .sf-urgency {
-          min-width: 56px;
-          text-align: center;
-          padding-top: 2px;
-          flex-shrink: 0;
-        }
+        .sf-card { display: flex; align-items: flex-start; gap: 16px; }
+        .sf-urgency { min-width: 56px; text-align: center; padding-top: 2px; flex-shrink: 0; }
         .sf-urgency-num { font-size: 22px; }
         .sf-urgency-label { font-size: 10px; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; }
-        .sf-status-col {
-          min-width: 120px;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 8px;
+        .sf-status-col { min-width: 120px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+
+        /* Today's Focus FAB */
+        .sf-fab {
+          position: fixed; bottom: 24px; right: 20px; z-index: 50;
+          background: linear-gradient(135deg, #F59E0B, #EF4444);
+          color: #fff; border: none; border-radius: 28px;
+          padding: 14px 20px; font-weight: 700; font-size: 14px;
+          cursor: pointer; box-shadow: 0 4px 24px rgba(239,68,68,0.45);
+          display: flex; align-items: center; gap: 8px;
+          transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .sf-fab:active { transform: scale(0.96); }
+        .sf-fab-badge {
+          background: #fff; color: #DC2626; border-radius: 50%;
+          width: 22px; height: 22px; display: flex; align-items: center;
+          justify-content: center; font-size: 12px; font-weight: 800;
           flex-shrink: 0;
         }
+
+        /* Modal overlay */
+        .sf-overlay {
+          position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+          z-index: 98; backdrop-filter: blur(3px);
+          animation: sfFadeIn 0.2s ease;
+        }
+        @keyframes sfFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Bottom sheet (shared) */
+        .sf-sheet {
+          position: fixed; bottom: 0; left: 0; right: 0; z-index: 99;
+          background: #0F172A; border-top: 1px solid #1E293B;
+          border-radius: 20px 20px 0 0;
+          max-height: 82vh; overflow-y: auto;
+          padding-bottom: env(safe-area-inset-bottom, 16px);
+          animation: sfSlideUp 0.28s cubic-bezier(0.32,0.72,0,1);
+        }
+        @keyframes sfSlideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        .sf-sheet-handle {
+          width: 40px; height: 4px; background: #334155; border-radius: 2px;
+          margin: 12px auto 0;
+        }
+        .sf-sheet-inner { padding: 16px 20px 24px; }
+
+        /* Desktop: centered modal */
+        @media (min-width: 641px) {
+          .sf-sheet {
+            top: 50%; left: 50%; right: auto; bottom: auto;
+            transform: translate(-50%, -50%);
+            width: min(600px, 92vw); max-height: 80vh;
+            border-radius: 16px; border: 1px solid #1E293B;
+            animation: sfScaleIn 0.2s cubic-bezier(0.32,0.72,0,1);
+          }
+          @keyframes sfScaleIn {
+            from { transform: translate(-50%, -48%) scale(0.96); opacity: 0; }
+            to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+          }
+          .sf-sheet-handle { display: none; }
+          .sf-sheet-inner { padding: 24px 28px 28px; }
+        }
+
+        /* Focus bid card */
+        .sf-focus-card {
+          background: #131825; border-radius: 12px; padding: 16px;
+          border: 1px solid #1E293B; margin-bottom: 10px;
+        }
+        .sf-focus-card:last-child { margin-bottom: 0; }
 
         /* ── Mobile ── */
         @media (max-width: 640px) {
           .sf-header { padding: 14px 16px !important; }
-
           .sf-stats { gap: 10px !important; margin-top: 14px !important; }
           .sf-stat-card { flex: 1 1 calc(50% - 5px) !important; min-width: 0 !important; padding: 12px 14px !important; }
-          .sf-stat-card .sf-stat-num { font-size: 20px !important; }
+          .sf-pipeline { padding: 12px 16px 80px !important; }
+          .sf-sources-wrap { padding: 12px 16px 80px !important; }
 
-          .sf-pipeline { padding: 12px 16px !important; }
-          .sf-sources-wrap { padding: 12px 16px !important; }
-
-          /* Filters: 2-column grid */
           .sf-filters { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
           .sf-search { grid-column: 1 / -1 !important; }
           .sf-addbtn { grid-column: 1 / -1 !important; width: 100% !important; }
-          .sf-filter-select { flex: unset !important; width: 100% !important; min-width: 0 !important; }
+          .sf-filter-select { flex: unset !important; width: 100% !important; }
 
-          /* Bid card: stack to single column */
           .sf-card { flex-direction: column !important; gap: 10px !important; }
-
-          /* Urgency: small inline row at top of card */
-          .sf-urgency {
-            min-width: unset !important;
-            text-align: left !important;
-            padding-top: 0 !important;
-            display: flex !important;
-            flex-direction: row !important;
-            align-items: center !important;
-            gap: 6px !important;
-          }
+          .sf-urgency { min-width: unset !important; text-align: left !important; padding-top: 0 !important; display: flex !important; flex-direction: row !important; align-items: center !important; gap: 6px !important; }
           .sf-urgency-num { font-size: 18px !important; }
-
-          /* Status: full-width bar at bottom */
-          .sf-status-col {
-            min-width: unset !important;
-            width: 100% !important;
-            flex-direction: row !important;
-            align-items: center !important;
-          }
+          .sf-status-col { min-width: unset !important; width: 100% !important; flex-direction: row !important; align-items: center !important; }
           .sf-status-col select { width: 100% !important; padding: 10px 12px !important; font-size: 13px !important; }
 
-          /* Source cards */
           .sf-source-grid { grid-template-columns: 1fr !important; }
           .sf-agg-grid { grid-template-columns: 1fr !important; }
+
+          .sf-focus-card { padding: 14px; }
         }
       `}</style>
 
@@ -224,7 +288,7 @@ export default function SiteForceBidPipeline() {
               <p style={{ fontSize: 12, color: "#64748B", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>Public Bid Pipeline — South Florida Civil</p>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {["pipeline", "sources"].map(v => (
               <button key={v} onClick={() => setView(v)} style={{
                 padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer",
@@ -232,6 +296,18 @@ export default function SiteForceBidPipeline() {
                 fontWeight: 600, fontSize: 13, transition: "all 0.2s"
               }}>{v === "pipeline" ? "Pipeline" : "Sources"}</button>
             ))}
+            {/* Desktop focus button */}
+            <button onClick={() => setShowFocus(true)} style={{
+              padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+              background: todayBids.length > 0 ? "linear-gradient(135deg, #F59E0B, #EF4444)" : "#1E293B",
+              color: todayBids.length > 0 ? "#fff" : "#94A3B8",
+              fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 8
+            }}>
+              Today's Focus
+              {todayBids.length > 0 && (
+                <span style={{ background: "rgba(255,255,255,0.25)", borderRadius: 20, padding: "1px 7px", fontSize: 12 }}>{todayBids.length}</span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -244,7 +320,7 @@ export default function SiteForceBidPipeline() {
             { label: "Bidding", value: stats.bidding, accent: "#10B981" },
           ].map((s, i) => (
             <div key={i} className="sf-stat-card" style={{ background: "#131825", borderRadius: 10, padding: "14px 18px", borderLeft: `3px solid ${s.accent}` }}>
-              <div className="sf-stat-num" style={{ fontSize: 24, fontWeight: 700, color: "#F8FAFC", fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#F8FAFC", fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</div>
               <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 2 }}>{s.label}</div>
             </div>
           ))}
@@ -317,7 +393,6 @@ export default function SiteForceBidPipeline() {
                   border: "1px solid #1E293B",
                   transition: "border-color 0.2s", borderLeftWidth: 3, borderLeftColor: src?.color || "#334155"
                 }}>
-                  {/* Urgency */}
                   <div className="sf-urgency">
                     {days !== null ? (
                       <>
@@ -333,7 +408,6 @@ export default function SiteForceBidPipeline() {
                     )}
                   </div>
 
-                  {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "#64748B", background: "#0A0E17", padding: "2px 8px", borderRadius: 4 }}>
@@ -352,7 +426,6 @@ export default function SiteForceBidPipeline() {
                     {bid.due && <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>Due: {new Date(bid.due + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>}
                   </div>
 
-                  {/* Status */}
                   <div className="sf-status-col">
                     <select value={bid.status} onChange={e => updateStatus(bid.id, e.target.value)} style={{
                       padding: "6px 10px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 600,
@@ -370,7 +443,6 @@ export default function SiteForceBidPipeline() {
           )}
         </div>
       ) : (
-        /* Sources View */
         <div className="sf-sources-wrap">
           <h2 style={{ fontSize: 16, fontWeight: 600, color: "#94A3B8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}>Registered Portal Sources</h2>
           <div className="sf-source-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
@@ -402,6 +474,131 @@ export default function SiteForceBidPipeline() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mobile FAB */}
+      <button className="sf-fab" onClick={() => setShowFocus(true)}>
+        <span>Today's Focus</span>
+        {todayBids.length > 0 && <span className="sf-fab-badge">{todayBids.length}</span>}
+      </button>
+
+      {/* Today's Focus Modal */}
+      {showFocus && (
+        <>
+          <div className="sf-overlay" onClick={() => setShowFocus(false)} />
+          <div className="sf-sheet">
+            <div className="sf-sheet-handle" />
+            <div className="sf-sheet-inner">
+              {/* Modal Header */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.02em" }}>Today's Focus</div>
+                  <div style={{ fontSize: 12, color: "#64748B", marginTop: 3 }}>{today}</div>
+                  {todayBids.length === 0 ? (
+                    <div style={{ fontSize: 13, color: "#10B981", marginTop: 6, fontWeight: 500 }}>All clear — no urgent bids right now.</div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 6 }}>
+                      <span style={{ color: "#F59E0B", fontWeight: 600 }}>{todayBids.length} bid{todayBids.length !== 1 ? "s" : ""}</span> need your attention
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setShowFocus(false)} style={{
+                  background: "#1E293B", border: "none", color: "#94A3B8", borderRadius: 8,
+                  width: 32, height: 32, fontSize: 18, cursor: "pointer", display: "flex",
+                  alignItems: "center", justifyContent: "center", flexShrink: 0
+                }}>×</button>
+              </div>
+
+              {/* Priority Tiers */}
+              {[1, 2, 3].map(tier => {
+                const tierBids = todayBids.filter(b => getFocusPriority(b).tier === tier);
+                if (tierBids.length === 0) return null;
+                const tierLabels = { 1: "Urgent", 2: "High Priority", 3: "Action Needed" };
+                const tierColors = { 1: "#DC2626", 2: "#EA580C", 3: "#A855F7" };
+                return (
+                  <div key={tier} style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: tierColors[tier], textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: tierColors[tier], display: "inline-block" }} />
+                      {tierLabels[tier]}
+                    </div>
+                    {tierBids.map(bid => {
+                      const days = daysUntil(bid.due);
+                      const src = PORTAL_SOURCES.find(s => s.id === bid.source);
+                      const stCfg = STATUS_CONFIG[bid.status];
+                      const priority = getFocusPriority(bid);
+                      return (
+                        <div key={bid.id} className="sf-focus-card" style={{ borderLeft: `3px solid ${src?.color || "#334155"}` }}>
+                          {/* Priority badge + countdown */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                              color: priority.color, background: priority.bg,
+                              padding: "3px 8px", borderRadius: 4
+                            }}>{priority.label}</span>
+                            {days !== null && (
+                              <span style={{
+                                fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+                                color: urgencyColor(days)
+                              }}>
+                                {days < 0 ? "OVERDUE" : days === 0 ? "DUE TODAY" : `${days}d left`}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Title */}
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F5F9", lineHeight: 1.3, marginBottom: 6 }}>{bid.title}</div>
+
+                          {/* Meta row */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                            <span style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "#64748B", background: "#0A0E17", padding: "2px 7px", borderRadius: 4 }}>
+                              {bid.solicitation}
+                            </span>
+                            <span style={{ fontSize: 11, color: src?.color, fontWeight: 600 }}>{src?.name}</span>
+                            <span style={{ fontSize: 10, color: "#64748B", background: "#1E293B", padding: "2px 6px", borderRadius: 4 }}>{bid.type}</span>
+                          </div>
+
+                          {/* Scope tags */}
+                          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
+                            {bid.scope.map(s => (
+                              <span key={s} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#1E293B", color: "#94A3B8", fontWeight: 500 }}>{s}</span>
+                            ))}
+                          </div>
+
+                          {bid.notes && (
+                            <div style={{ fontSize: 12, color: "#64748B", marginBottom: 8, lineHeight: 1.4 }}>{bid.notes}</div>
+                          )}
+
+                          {/* Due date + status update */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                            {bid.due && (
+                              <div style={{ fontSize: 12, color: "#475569" }}>
+                                Due: <strong style={{ color: urgencyColor(days) }}>{new Date(bid.due + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</strong>
+                              </div>
+                            )}
+                            <select value={bid.status} onChange={e => updateStatus(bid.id, e.target.value)} style={{
+                              padding: "7px 12px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 600,
+                              background: stCfg.bg, color: stCfg.color, cursor: "pointer", marginLeft: "auto"
+                            }}>
+                              {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              {todayBids.length === 0 && (
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "#475569" }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>✓</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "#64748B" }}>Nothing urgent today</div>
+                  <div style={{ fontSize: 13, color: "#475569", marginTop: 4 }}>Keep tracking and check back tomorrow.</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
