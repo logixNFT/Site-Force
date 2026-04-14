@@ -125,13 +125,100 @@ export default function SiteForceBidPipeline() {
         ::-webkit-scrollbar-track { background: #1A1F2E; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         input, select { font-family: inherit; }
+
+        .sf-header { padding: 20px 28px; }
+        .sf-stats { display: flex; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+        .sf-stat-card { flex: 1 1 120px; }
+        .sf-pipeline { padding: 20px 28px; }
+        .sf-sources-wrap { padding: 20px 28px; }
+
+        /* Filters: flex row on desktop */
+        .sf-filters {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+        .sf-search { flex: 1 1 200px; }
+        .sf-filter-select { flex: 1 1 140px; }
+        .sf-addbtn { flex-shrink: 0; }
+
+        /* Bid card: 3-column row on desktop */
+        .sf-card {
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+        }
+        .sf-urgency {
+          min-width: 56px;
+          text-align: center;
+          padding-top: 2px;
+          flex-shrink: 0;
+        }
+        .sf-urgency-num { font-size: 22px; }
+        .sf-urgency-label { font-size: 10px; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; }
+        .sf-status-col {
+          min-width: 120px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 640px) {
+          .sf-header { padding: 14px 16px !important; }
+
+          .sf-stats { gap: 10px !important; margin-top: 14px !important; }
+          .sf-stat-card { flex: 1 1 calc(50% - 5px) !important; min-width: 0 !important; padding: 12px 14px !important; }
+          .sf-stat-card .sf-stat-num { font-size: 20px !important; }
+
+          .sf-pipeline { padding: 12px 16px !important; }
+          .sf-sources-wrap { padding: 12px 16px !important; }
+
+          /* Filters: 2-column grid */
+          .sf-filters { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+          .sf-search { grid-column: 1 / -1 !important; }
+          .sf-addbtn { grid-column: 1 / -1 !important; width: 100% !important; }
+          .sf-filter-select { flex: unset !important; width: 100% !important; min-width: 0 !important; }
+
+          /* Bid card: stack to single column */
+          .sf-card { flex-direction: column !important; gap: 10px !important; }
+
+          /* Urgency: small inline row at top of card */
+          .sf-urgency {
+            min-width: unset !important;
+            text-align: left !important;
+            padding-top: 0 !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 6px !important;
+          }
+          .sf-urgency-num { font-size: 18px !important; }
+
+          /* Status: full-width bar at bottom */
+          .sf-status-col {
+            min-width: unset !important;
+            width: 100% !important;
+            flex-direction: row !important;
+            align-items: center !important;
+          }
+          .sf-status-col select { width: 100% !important; padding: 10px 12px !important; font-size: 13px !important; }
+
+          /* Source cards */
+          .sf-source-grid { grid-template-columns: 1fr !important; }
+          .sf-agg-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       {/* Header */}
-      <div style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", borderBottom: "1px solid #1E293B", padding: "20px 28px" }}>
+      <div className="sf-header" style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", borderBottom: "1px solid #1E293B" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: "linear-gradient(135deg, #F59E0B, #EF4444)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: "#fff" }}>SF</div>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: "linear-gradient(135deg, #F59E0B, #EF4444)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: "#fff", flexShrink: 0 }}>SF</div>
             <div>
               <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.02em" }}>SiteForce</h1>
               <p style={{ fontSize: 12, color: "#64748B", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>Public Bid Pipeline — South Florida Civil</p>
@@ -149,15 +236,15 @@ export default function SiteForceBidPipeline() {
         </div>
 
         {/* Stats Row */}
-        <div style={{ display: "flex", gap: 16, marginTop: 20, flexWrap: "wrap" }}>
+        <div className="sf-stats">
           {[
             { label: "Total Tracked", value: stats.total, accent: "#64748B" },
             { label: "Active", value: stats.active, accent: "#3B82F6" },
             { label: "Due \u226414 Days", value: stats.dueSoon, accent: "#F59E0B" },
             { label: "Bidding", value: stats.bidding, accent: "#10B981" },
           ].map((s, i) => (
-            <div key={i} style={{ flex: "1 1 120px", background: "#131825", borderRadius: 10, padding: "14px 18px", borderLeft: `3px solid ${s.accent}` }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "#F8FAFC", fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</div>
+            <div key={i} className="sf-stat-card" style={{ background: "#131825", borderRadius: 10, padding: "14px 18px", borderLeft: `3px solid ${s.accent}` }}>
+              <div className="sf-stat-num" style={{ fontSize: 24, fontWeight: 700, color: "#F8FAFC", fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</div>
               <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 2 }}>{s.label}</div>
             </div>
           ))}
@@ -165,33 +252,33 @@ export default function SiteForceBidPipeline() {
       </div>
 
       {view === "pipeline" ? (
-        <div style={{ padding: "20px 28px" }}>
+        <div className="sf-pipeline">
           {/* Filters */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-            <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search bids..."
-              style={{ flex: "1 1 200px", padding: "10px 14px", borderRadius: 8, border: "1px solid #1E293B", background: "#131825", color: "#E2E8F0", fontSize: 13, outline: "none" }} />
-            <select value={filterSource} onChange={e => setFilterSource(e.target.value)}
+          <div className="sf-filters">
+            <input className="sf-search" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search bids..."
+              style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #1E293B", background: "#131825", color: "#E2E8F0", fontSize: 13, outline: "none" }} />
+            <select className="sf-filter-select" value={filterSource} onChange={e => setFilterSource(e.target.value)}
               style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #1E293B", background: "#131825", color: "#E2E8F0", fontSize: 13 }}>
               <option value="all">All Sources</option>
               {PORTAL_SOURCES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <select value={filterScope} onChange={e => setFilterScope(e.target.value)}
+            <select className="sf-filter-select" value={filterScope} onChange={e => setFilterScope(e.target.value)}
               style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #1E293B", background: "#131825", color: "#E2E8F0", fontSize: 13 }}>
               <option value="all">All Scopes</option>
               {SCOPE_TAGS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            <select className="sf-filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
               style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #1E293B", background: "#131825", color: "#E2E8F0", fontSize: 13 }}>
               <option value="all">All Statuses</option>
               {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+            <select className="sf-filter-select" value={sortBy} onChange={e => setSortBy(e.target.value)}
               style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #1E293B", background: "#131825", color: "#E2E8F0", fontSize: 13 }}>
               <option value="due">Sort: Due Date</option>
               <option value="source">Sort: Source</option>
               <option value="status">Sort: Status</option>
             </select>
-            <button onClick={() => setShowAddForm(!showAddForm)} style={{
+            <button className="sf-addbtn" onClick={() => setShowAddForm(!showAddForm)} style={{
               padding: "10px 18px", borderRadius: 8, border: "none", cursor: "pointer",
               background: "#F59E0B", color: "#0F172A", fontWeight: 600, fontSize: 13
             }}>+ Add Bid</button>
@@ -204,7 +291,7 @@ export default function SiteForceBidPipeline() {
                 <input placeholder="Solicitation #" value={newBid.solicitation} onChange={e => setNewBid(p => ({ ...p, solicitation: e.target.value }))}
                   style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #334155", background: "#0A0E17", color: "#E2E8F0", fontSize: 13 }} />
                 <input placeholder="Project Title" value={newBid.title} onChange={e => setNewBid(p => ({ ...p, title: e.target.value }))}
-                  style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #334155", background: "#0A0E17", color: "#E2E8F0", fontSize: 13, gridColumn: "span 2" }} />
+                  style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #334155", background: "#0A0E17", color: "#E2E8F0", fontSize: 13 }} />
                 <select value={newBid.source} onChange={e => setNewBid(p => ({ ...p, source: e.target.value }))}
                   style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #334155", background: "#0A0E17", color: "#E2E8F0", fontSize: 13 }}>
                   {PORTAL_SOURCES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -225,19 +312,19 @@ export default function SiteForceBidPipeline() {
               const src = PORTAL_SOURCES.find(s => s.id === bid.source);
               const stCfg = STATUS_CONFIG[bid.status];
               return (
-                <div key={bid.id} style={{
+                <div key={bid.id} className="sf-card" style={{
                   background: "#131825", borderRadius: 10, padding: "16px 20px",
-                  border: "1px solid #1E293B", display: "flex", alignItems: "flex-start", gap: 16,
+                  border: "1px solid #1E293B",
                   transition: "border-color 0.2s", borderLeftWidth: 3, borderLeftColor: src?.color || "#334155"
                 }}>
                   {/* Urgency */}
-                  <div style={{ minWidth: 56, textAlign: "center", paddingTop: 2 }}>
+                  <div className="sf-urgency">
                     {days !== null ? (
                       <>
-                        <div style={{ fontSize: 22, fontWeight: 700, color: urgencyColor(days), fontFamily: "'JetBrains Mono', monospace" }}>
+                        <div className="sf-urgency-num" style={{ fontWeight: 700, color: urgencyColor(days), fontFamily: "'JetBrains Mono', monospace" }}>
                           {days < 0 ? "\u2014" : days}
                         </div>
-                        <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        <div className="sf-urgency-label">
                           {days < 0 ? "Past" : days === 0 ? "Today" : days === 1 ? "Day" : "Days"}
                         </div>
                       </>
@@ -266,7 +353,7 @@ export default function SiteForceBidPipeline() {
                   </div>
 
                   {/* Status */}
-                  <div style={{ minWidth: 120, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                  <div className="sf-status-col">
                     <select value={bid.status} onChange={e => updateStatus(bid.id, e.target.value)} style={{
                       padding: "6px 10px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 600,
                       background: stCfg.bg, color: stCfg.color, cursor: "pointer", textAlign: "center"
@@ -284,9 +371,9 @@ export default function SiteForceBidPipeline() {
         </div>
       ) : (
         /* Sources View */
-        <div style={{ padding: "20px 28px" }}>
+        <div className="sf-sources-wrap">
           <h2 style={{ fontSize: 16, fontWeight: 600, color: "#94A3B8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}>Registered Portal Sources</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          <div className="sf-source-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
             {sourceStats.map(s => (
               <div key={s.id} style={{ background: "#131825", borderRadius: 10, padding: 20, border: "1px solid #1E293B", borderLeftWidth: 4, borderLeftColor: s.color }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#F1F5F9" }}>{s.name}</div>
@@ -299,7 +386,7 @@ export default function SiteForceBidPipeline() {
           </div>
           <div style={{ marginTop: 28, background: "#131825", borderRadius: 10, padding: 20, border: "1px solid #1E293B" }}>
             <h3 style={{ fontSize: 14, fontWeight: 600, color: "#F59E0B", marginBottom: 12 }}>Aggregator Services</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+            <div className="sf-agg-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
               {[
                 { name: "DemandStar", url: "https://network.demandstar.com", note: "Broward, WPB, Hollywood, SFWMD" },
                 { name: "BidNet Direct", url: "https://www.bidnetdirect.com", note: "City of Miami + others" },
